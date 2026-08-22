@@ -15,13 +15,33 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import importlib.util
 import os
 import sys
+import types
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "tesira"))
+# client.py uses a relative import ("from .const import ...") so it must be
+# loaded as part of a package. custom_components/tesira/__init__.py can't be
+# that package here since it imports Home Assistant, which this stand-alone
+# script has no need for - so build a synthetic one instead.
+_PKG_DIR = Path(__file__).resolve().parents[1] / "custom_components" / "tesira"
+_PKG_NAME = "tesira_standalone"
 
-from client import TesiraClient, TesiraConnectionInfo, TesiraError  # noqa: E402
+_pkg = types.ModuleType(_PKG_NAME)
+_pkg.__path__ = [str(_PKG_DIR)]
+sys.modules[_PKG_NAME] = _pkg
+
+for _module_name in ("const", "client"):
+    _spec = importlib.util.spec_from_file_location(
+        f"{_PKG_NAME}.{_module_name}", _PKG_DIR / f"{_module_name}.py"
+    )
+    _module = importlib.util.module_from_spec(_spec)
+    _module.__package__ = _PKG_NAME
+    sys.modules[_spec.name] = _module
+    _spec.loader.exec_module(_module)
+
+from tesira_standalone.client import TesiraClient, TesiraConnectionInfo, TesiraError  # noqa: E402
 
 
 async def main() -> int:

@@ -119,7 +119,11 @@ class TesiraClient:
                 known_hosts=None,
                 login_timeout=self._info.timeout,
             )
-            self._process = await self._conn.create_process(term_type=None, encoding="utf-8")
+            # A PTY is required: without one, the Tesira accepts the SSH
+            # session and banner but silently drops the connection the
+            # moment a command is written to stdin. Confirmed against a
+            # live TesiraFORTE over SSH.
+            self._process = await self._conn.create_process(term_type="dumb", encoding="utf-8")
         except (OSError, asyncssh.Error) as err:
             await self._cleanup()
             raise TesiraConnectionError(f"could not connect to {self._info.host}: {err}") from err

@@ -69,6 +69,14 @@ request-scoped), reconnecting automatically if the session drops.
 
 Settings → Devices & Services → Biamp Tesira → Configure → *Add a preset*.
 
+## Notes from testing against a real device
+
+Validated end-to-end against a live TesiraFORTE (login, discovery, and
+listing all Instance Tags). One thing that isn't documented: the SSH
+channel needs a PTY allocated, or the device accepts the connection and
+banner then silently drops it the instant a command is sent. The client
+requests one (`term_type="dumb"`) for this reason.
+
 ## Known limitations
 
 - If a Preset Button block is later removed from the design, its Home
