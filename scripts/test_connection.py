@@ -17,6 +17,7 @@ import asyncio
 import importlib.util
 import os
 import sys
+import time
 import types
 from pathlib import Path
 
@@ -57,6 +58,19 @@ async def main() -> int:
         metavar="TAG[:CHANNEL]",
         help="Read a Level Control block's value/min/max (repeatable)",
     )
+    parser.add_argument(
+        "--subscribe",
+        metavar="TAG[:CHANNEL]",
+        help="Subscribe to a level and print push updates for --subscribe-seconds",
+    )
+    parser.add_argument(
+        "--subscribe-seconds", type=float, default=20.0, help="How long to listen for pushes"
+    )
+    parser.add_argument(
+        "--set-level",
+        metavar="TAG[:CHANNEL]=VALUE",
+        help="Set a Level Control block's value, e.g. ProgramLevel=-20 or Zone2:2=-6",
+    )
     args = parser.parse_args()
 
     if not args.host:
@@ -91,6 +105,29 @@ async def main() -> int:
                 print(f"\n{tag} channel {channel}: {value} dB (range {min_level} to {max_level} dB)")
             except TesiraError as level_err:
                 print(f"\n{tag} channel {channel}: ERROR: {level_err}")
+
+        if args.set_level:
+            spec, _, value_str = args.set_level.partition("=")
+            tag, _, channel_str = spec.partition(":")
+            channel = int(channel_str) if channel_str else 1
+            value = float(value_str)
+            print(f"\nSetting {tag} channel {channel} to {value} dB ...")
+            await client.set_level(tag, channel, value)
+            print("Set.")
+
+        if args.subscribe:
+            tag, _, channel_str = args.subscribe.partition(":")
+            channel = int(channel_str) if channel_str else 1
+            print(f"\nSubscribing to {tag} channel {channel} for {args.subscribe_seconds}s ...")
+
+            def _on_push(value: float, _tag: str = tag) -> None:
+                print(f"  [{time.strftime('%H:%M:%S')}] push: {_tag} = {value} dB")
+
+            token = "test_connection_script"
+            await client.subscribe_level(tag, channel, token, _on_push)
+            await asyncio.sleep(args.subscribe_seconds)
+            await client.unsubscribe_level(token)
+            print("Unsubscribed.")
 
     except TesiraError as err:
         print(f"ERROR: {err}", file=sys.stderr)

@@ -16,7 +16,7 @@ from .const import CONF_PRESETS, DOMAIN
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
-    client = hass.data[DOMAIN][entry.entry_id].client
+    client = hass.data[DOMAIN][entry.entry_id]
     presets: list[str] = entry.options.get(CONF_PRESETS, [])
     async_add_entities(
         TesiraPresetButton(client, entry.entry_id, name) for name in presets

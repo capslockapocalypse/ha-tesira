@@ -12,4 +12,4 @@ CONF_LEVEL_CHANNEL = "channel"  # options-flow form field key
 
 DEFAULT_PORT = 22
 DEFAULT_TIMEOUT = 10  # seconds to wait for a single command response
-DEFAULT_LEVEL_POLL_INTERVAL = 10  # seconds between level/mute polls
+DEFAULT_LEVEL_SUBSCRIBE_THROTTLE_MS = 250  # min spacing between push updates for one level
