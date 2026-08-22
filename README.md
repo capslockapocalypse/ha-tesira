@@ -1,7 +1,9 @@
 # Home Assistant integration for Biamp Tesira
 
-Controls a Biamp Tesira DSP over SSH using the Tesira Text Protocol (TTP),
-and exposes configured presets to Home Assistant as push buttons.
+Controls a Biamp Tesira DSP over SSH using the Tesira Text Protocol (TTP).
+Exposes configured presets to Home Assistant as push buttons, and
+configured Level Control blocks as `number` entities (dB faders), polled
+so external changes on the Tesira show up in Home Assistant too.
 
 Built against Biamp Cornerstone's official "Tesira Text Protocol" manual
 (v4.2, Dec 2021) and the current TTP reference tables at
@@ -21,6 +23,35 @@ DEVICE recallPresetByName "<name>"
 
 The name must match the preset's name in the Tesira project exactly
 (case- and spelling-sensitive).
+
+## How level controls work
+
+Each Level Control block in a Tesira design is addressed by its Instance
+Tag and a channel number (channel 1 for a single-channel block). You give
+the integration the tag (and channel, if not 1) and it creates a `number`
+entity — a dB slider — backed by:
+
+```
+<tag> get level <channel>       # read on every poll
+<tag> set level <channel> <dB>  # write when moved in Home Assistant
+```
+
+The slider's min/max are read once from the block's own `minLevel` /
+`maxLevel` attributes at startup, not hardcoded to Tesira's absolute
+-100 to +12 dB limits, so it matches whatever range was configured in
+the design. When you add a level control in the config/options flow, the
+integration immediately tries to read its value to confirm the tag (and
+channel) are actually a Level Control block — Leveler, Compressor, and
+other dynamics blocks look similar but don't expose a `level` attribute
+and will be rejected at that point rather than failing silently later.
+
+Every level control is polled every 10 seconds (`DEFAULT_LEVEL_POLL_INTERVAL`
+in `const.py`) so a change made directly on the Tesira — another control
+system, the front panel, Tesira software — is reflected in Home Assistant
+within that window. TTP does support push-style `subscribe`, which would
+update faster and with less SSH traffic, but polling was chosen instead
+for simplicity and to avoid managing subscription state across
+reconnects.
 
 ## Installation
 
@@ -54,21 +85,28 @@ presets — enter each preset's exact name, add as many as you like, then
 *Done* to finish. You don't have to add any at this point; presets can
 always be added or removed later too.
 
-### Adding preset buttons later
+### Adding presets or level controls later
 
-Settings → Devices & Services → Biamp Tesira → Configure → *Add a preset*,
-enter the preset's exact name. Each preset creates one button entity.
-Remove presets from the same menu; changes take effect immediately (the
-integration reloads automatically when options change).
+Settings → Devices & Services → Biamp Tesira → Configure. Same menu as
+during setup: *Add a preset* (name only), *Add a level control* (Instance
+Tag + channel), and the matching *Remove* options. Changes take effect
+immediately — the integration reloads automatically when options change.
 
 ## Notes from testing against a real device
 
 Validated end-to-end against a live TesiraFORTE — SSH
-login with `default`/`default`, and the TTP shell session itself. One
-thing that isn't documented: the SSH channel needs a PTY allocated, or
-the device accepts the connection and banner then silently drops it the
-instant a command is sent. The client requests one (`term_type="dumb"`)
-for this reason.
+login with `default`/`default`, the TTP shell session itself, a real
+`recallPresetByName` call, and `get level`/`get minLevel`/`get maxLevel`
+against several real Level Control blocks (`ProgramLevel`, `SubLevel`,
+`Level3`). One thing that isn't documented: the SSH channel needs a PTY
+allocated, or the device accepts the connection and banner then silently
+drops it the instant a command is sent. The client requests one
+(`term_type="dumb"`) for this reason.
+
+Also confirmed live: pointing the level-control validation at a Leveler
+block instead of a Level Control block (`Leveler1`) correctly fails with
+`-ERR 'level' is not supported by LevelerInterface::Attributes` — exactly
+the case the add-level config step's validation is meant to catch.
 
 ## Known limitations
 
@@ -96,6 +134,10 @@ python3 -m venv .venv
 # also recall a preset by name:
 .venv/bin/python scripts/test_connection.py \
     --host 10.0.0.5 --recall "Morning Announcement"
+
+# read one or more Level Control blocks (repeatable, TAG or TAG:CHANNEL):
+.venv/bin/python scripts/test_connection.py \
+    --host 10.0.0.5 --get-level ProgramLevel --get-level "Zone 2 Volume:1"
 ```
 
 Credentials can also come from `TESIRA_HOST` / `TESIRA_USERNAME` /

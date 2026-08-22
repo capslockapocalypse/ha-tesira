@@ -14,11 +14,15 @@ Key facts this client relies on:
     a reason).
   * Presets are recalled by name via the DEVICE service command
     `recallPresetByName`; there is no TTP command to enumerate presets.
+  * A Level Control block's fader is the "level" attribute (dB, ranged by
+    its own minLevel/maxLevel), addressed by its Instance Tag and a
+    channel index (`Level1 get level 1` -> `+OK "value":-10.000000`).
 """
 from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from dataclasses import dataclass
 
 import asyncssh
@@ -26,6 +30,8 @@ import asyncssh
 _LOGGER = logging.getLogger(__name__)
 
 BANNER_IDLE_TIMEOUT = 0.5
+
+_VALUE_RE = re.compile(r'"value"\s*:\s*(-?\d+(?:\.\d+)?)')
 
 
 class TesiraError(Exception):
@@ -48,6 +54,19 @@ class TesiraCommandError(TesiraError):
 def _escape_value(text: str) -> str:
     """Escape a string for use inside a double-quoted TTP Value."""
     return text.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _quote_tag(tag: str) -> str:
+    """Quote an Instance Tag if it contains whitespace, per TTP syntax rules."""
+    if re.search(r"\s", tag):
+        return f'"{tag}"'
+    return tag
+
+
+def parse_float_value(body: str) -> float | None:
+    """Extract the numeric "value":X token from a response body, if present."""
+    match = _VALUE_RE.search(body)
+    return float(match.group(1)) if match else None
 
 
 @dataclass
@@ -160,3 +179,24 @@ class TesiraClient:
 
     async def recall_preset_by_name(self, name: str) -> None:
         await self.send_command(f'DEVICE recallPresetByName "{_escape_value(name)}"')
+
+    async def _get_float(self, tag: str, attribute: str, channel: int) -> float:
+        body = await self.send_command(f"{_quote_tag(tag)} get {attribute} {channel}")
+        value = parse_float_value(body)
+        if value is None:
+            raise TesiraCommandError(
+                f"{tag} get {attribute} {channel}", f"could not parse a numeric value from: {body}"
+            )
+        return value
+
+    async def get_level(self, tag: str, channel: int) -> float:
+        return await self._get_float(tag, "level", channel)
+
+    async def set_level(self, tag: str, channel: int, value: float) -> None:
+        await self.send_command(f"{_quote_tag(tag)} set level {channel} {value}")
+
+    async def get_level_range(self, tag: str, channel: int) -> tuple[float, float]:
+        """Return the (minLevel, maxLevel) dB bounds configured on the block."""
+        min_level = await self._get_float(tag, "minLevel", channel)
+        max_level = await self._get_float(tag, "maxLevel", channel)
+        return min_level, max_level

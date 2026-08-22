@@ -12,11 +12,13 @@
         }
       },
       "menu": {
-        "title": "Presets",
-        "description": "Add the presets you want as buttons in Home Assistant. You can add or remove more later from this integration's Configure menu.",
+        "title": "Presets and levels",
+        "description": "Add the presets and level (fader) controls you want in Home Assistant. You can add or remove more later from this integration's Configure menu.",
         "menu_options": {
           "add_preset": "Add a preset",
           "remove_preset": "Remove a preset",
+          "add_level": "Add a level control",
+          "remove_level": "Remove a level control",
           "finish": "Done"
         }
       },
@@ -32,12 +34,29 @@
         "data": {
           "presets": "Presets to remove"
         }
+      },
+      "add_level": {
+        "title": "Add a level control",
+        "description": "Enter the Instance Tag of the Level Control block (found in the Tesira design's DSP Properties), and the channel number if it has more than one. The value, min, and max are read from the device.",
+        "data": {
+          "tag": "Instance Tag",
+          "channel": "Channel"
+        }
+      },
+      "remove_level": {
+        "title": "Remove level controls",
+        "data": {
+          "levels": "Level controls to remove"
+        }
       }
     },
     "error": {
       "cannot_connect": "Could not connect to the Tesira over SSH. Check the host, port, and credentials.",
       "name_required": "Enter a preset name.",
-      "already_exists": "That preset is already in the list."
+      "already_exists": "That preset is already in the list.",
+      "tag_required": "Enter the Level Control block's Instance Tag.",
+      "level_already_exists": "That block and channel are already in the list.",
+      "level_not_found": "Could not read a level from that block. Check the Instance Tag and channel, and that it's a Level Control block."
     },
     "abort": {
       "already_configured": "This Tesira is already configured."
@@ -46,10 +65,12 @@
   "options": {
     "step": {
       "menu": {
-        "title": "Presets",
+        "title": "Presets and levels",
         "menu_options": {
           "add_preset": "Add a preset",
           "remove_preset": "Remove a preset",
+          "add_level": "Add a level control",
+          "remove_level": "Remove a level control",
           "finish": "Done"
         }
       },
@@ -65,11 +86,28 @@
         "data": {
           "presets": "Presets to remove"
         }
+      },
+      "add_level": {
+        "title": "Add a level control",
+        "description": "Enter the Instance Tag of the Level Control block (found in the Tesira design's DSP Properties), and the channel number if it has more than one. The value, min, and max are read from the device.",
+        "data": {
+          "tag": "Instance Tag",
+          "channel": "Channel"
+        }
+      },
+      "remove_level": {
+        "title": "Remove level controls",
+        "data": {
+          "levels": "Level controls to remove"
+        }
       }
     },
     "error": {
       "name_required": "Enter a preset name.",
-      "already_exists": "That preset is already in the list."
+      "already_exists": "That preset is already in the list.",
+      "tag_required": "Enter the Level Control block's Instance Tag.",
+      "level_already_exists": "That block and channel are already in the list.",
+      "level_not_found": "Could not read a level from that block. Check the Instance Tag and channel, and that it's a Level Control block."
     }
   }
 }

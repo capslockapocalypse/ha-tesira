@@ -50,6 +50,13 @@ async def main() -> int:
     parser.add_argument("--username", default=os.environ.get("TESIRA_USERNAME", "default"))
     parser.add_argument("--password", default=os.environ.get("TESIRA_PASSWORD", "default"))
     parser.add_argument("--recall", help="Preset name to recall after connecting")
+    parser.add_argument(
+        "--get-level",
+        action="append",
+        default=[],
+        metavar="TAG[:CHANNEL]",
+        help="Read a Level Control block's value/min/max (repeatable)",
+    )
     args = parser.parse_args()
 
     if not args.host:
@@ -74,6 +81,16 @@ async def main() -> int:
             print(f"\nRecalling preset {args.recall!r} ...")
             await client.recall_preset_by_name(args.recall)
             print("Recalled.")
+
+        for spec in args.get_level:
+            tag, _, channel_str = spec.partition(":")
+            channel = int(channel_str) if channel_str else 1
+            try:
+                value = await client.get_level(tag, channel)
+                min_level, max_level = await client.get_level_range(tag, channel)
+                print(f"\n{tag} channel {channel}: {value} dB (range {min_level} to {max_level} dB)")
+            except TesiraError as level_err:
+                print(f"\n{tag} channel {channel}: ERROR: {level_err}")
 
     except TesiraError as err:
         print(f"ERROR: {err}", file=sys.stderr)
