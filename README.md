@@ -49,7 +49,12 @@ The integration keeps one persistent SSH session open to the device and
 serializes commands over it (TTP is a stateful line protocol, not
 request-scoped), reconnecting automatically if the session drops.
 
-### Adding preset buttons
+Once the connection test succeeds, setup continues straight into adding
+presets — enter each preset's exact name, add as many as you like, then
+*Done* to finish. You don't have to add any at this point; presets can
+always be added or removed later too.
+
+### Adding preset buttons later
 
 Settings → Devices & Services → Biamp Tesira → Configure → *Add a preset*,
 enter the preset's exact name. Each preset creates one button entity.

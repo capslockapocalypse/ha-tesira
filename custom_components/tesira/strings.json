@@ -10,10 +10,34 @@
           "username": "Username",
           "password": "Password"
         }
+      },
+      "menu": {
+        "title": "Presets",
+        "description": "Add the presets you want as buttons in Home Assistant. You can add or remove more later from this integration's Configure menu.",
+        "menu_options": {
+          "add_preset": "Add a preset",
+          "remove_preset": "Remove a preset",
+          "finish": "Done"
+        }
+      },
+      "add_preset": {
+        "title": "Add a preset",
+        "description": "Enter the preset name exactly as it's named in the Tesira project (DEVICE recallPresetByName is case- and spelling-sensitive).",
+        "data": {
+          "name": "Name"
+        }
+      },
+      "remove_preset": {
+        "title": "Remove presets",
+        "data": {
+          "presets": "Presets to remove"
+        }
       }
     },
     "error": {
-      "cannot_connect": "Could not connect to the Tesira over SSH. Check the host, port, and credentials."
+      "cannot_connect": "Could not connect to the Tesira over SSH. Check the host, port, and credentials.",
+      "name_required": "Enter a preset name.",
+      "already_exists": "That preset is already in the list."
     },
     "abort": {
       "already_configured": "This Tesira is already configured."

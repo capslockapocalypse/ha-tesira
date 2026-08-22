@@ -24,10 +24,58 @@ USER_SCHEMA = vol.Schema(
 ADD_PRESET_SCHEMA = vol.Schema({vol.Required(CONF_PRESET_NAME): str})
 
 
-class TesiraConfigFlow(ConfigFlow, domain=DOMAIN):
+class _PresetStepsMixin:
+    """Add/remove-preset steps shared by the config flow and options flow.
+
+    Requires the including flow to maintain a ``self._presets: list[str]``
+    and to implement ``async_step_finish``.
+    """
+
+    _presets: list[str]
+
+    async def async_step_menu(self, user_input: dict[str, Any] | None = None):
+        return self.async_show_menu(  # type: ignore[attr-defined]
+            step_id="menu", menu_options=["add_preset", "remove_preset", "finish"]
+        )
+
+    async def async_step_add_preset(self, user_input: dict[str, Any] | None = None):
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            name = user_input[CONF_PRESET_NAME].strip()
+            if not name:
+                errors["base"] = "name_required"
+            elif name in self._presets:
+                errors["base"] = "already_exists"
+            else:
+                self._presets.append(name)
+                return await self.async_step_menu()
+
+        return self.async_show_form(  # type: ignore[attr-defined]
+            step_id="add_preset", data_schema=ADD_PRESET_SCHEMA, errors=errors
+        )
+
+    async def async_step_remove_preset(self, user_input: dict[str, Any] | None = None):
+        if not self._presets:
+            return await self.async_step_menu()
+
+        if user_input is not None:
+            to_remove = set(user_input["presets"])
+            self._presets = [name for name in self._presets if name not in to_remove]
+            return await self.async_step_menu()
+
+        options = {name: name for name in self._presets}
+        schema = vol.Schema({vol.Required("presets", default=[]): cv.multi_select(options)})
+        return self.async_show_form(step_id="remove_preset", data_schema=schema)  # type: ignore[attr-defined]
+
+
+class TesiraConfigFlow(_PresetStepsMixin, ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Biamp Tesira."""
 
     VERSION = 1
+
+    def __init__(self) -> None:
+        self._connection_data: dict[str, Any] = {}
+        self._presets: list[str] = []
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
@@ -49,13 +97,19 @@ class TesiraConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 await self.async_set_unique_id(f"{user_input[CONF_HOST]}:{user_input[CONF_PORT]}")
                 self._abort_if_unique_id_configured()
-                return self.async_create_entry(
-                    title=f"Tesira ({user_input[CONF_HOST]})", data=user_input
-                )
+                self._connection_data = user_input
+                return await self.async_step_menu()
             finally:
                 await client.disconnect()
 
         return self.async_show_form(step_id="user", data_schema=USER_SCHEMA, errors=errors)
+
+    async def async_step_finish(self, user_input: dict[str, Any] | None = None):
+        return self.async_create_entry(
+            title=f"Tesira ({self._connection_data[CONF_HOST]})",
+            data=self._connection_data,
+            options={CONF_PRESETS: self._presets},
+        )
 
     @staticmethod
     @callback
@@ -63,48 +117,14 @@ class TesiraConfigFlow(ConfigFlow, domain=DOMAIN):
         return TesiraOptionsFlow(config_entry)
 
 
-class TesiraOptionsFlow(OptionsFlow):
-    """Manage the list of preset names exposed as buttons."""
+class TesiraOptionsFlow(_PresetStepsMixin, OptionsFlow):
+    """Manage the list of preset names exposed as buttons, after setup."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         self._presets: list[str] = list(config_entry.options.get(CONF_PRESETS, []))
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         return await self.async_step_menu()
-
-    async def async_step_menu(self, user_input: dict[str, Any] | None = None):
-        return self.async_show_menu(
-            step_id="menu", menu_options=["add_preset", "remove_preset", "finish"]
-        )
-
-    async def async_step_add_preset(self, user_input: dict[str, Any] | None = None):
-        errors: dict[str, str] = {}
-        if user_input is not None:
-            name = user_input[CONF_PRESET_NAME].strip()
-            if not name:
-                errors["base"] = "name_required"
-            elif name in self._presets:
-                errors["base"] = "already_exists"
-            else:
-                self._presets.append(name)
-                return await self.async_step_menu()
-
-        return self.async_show_form(
-            step_id="add_preset", data_schema=ADD_PRESET_SCHEMA, errors=errors
-        )
-
-    async def async_step_remove_preset(self, user_input: dict[str, Any] | None = None):
-        if not self._presets:
-            return await self.async_step_menu()
-
-        if user_input is not None:
-            to_remove = set(user_input["presets"])
-            self._presets = [name for name in self._presets if name not in to_remove]
-            return await self.async_step_menu()
-
-        options = {name: name for name in self._presets}
-        schema = vol.Schema({vol.Required("presets", default=[]): cv.multi_select(options)})
-        return self.async_show_form(step_id="remove_preset", data_schema=schema)
 
     async def async_step_finish(self, user_input: dict[str, Any] | None = None):
         return self.async_create_entry(title="", data={CONF_PRESETS: self._presets})
