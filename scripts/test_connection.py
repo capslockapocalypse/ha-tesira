@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 """Stand-alone smoke test against a real Tesira, outside of Home Assistant.
 
-Connects over SSH, lists every Instance Tag, probes each for a Preset
-Button assignment, and prints what was discovered. Nothing is recalled
-unless you pass --recall.
+Connects over SSH and confirms the TTP shell responds. Pass --recall
+"<preset name>" to also call DEVICE recallPresetByName with it.
 
 Usage:
     TESIRA_HOST=10.0.0.5 TESIRA_USERNAME=default TESIRA_PASSWORD=default \\
-        .venv-test/bin/python scripts/test_connection.py
+        .venv/bin/python scripts/test_connection.py
 
-    ... --recall 1001      # also calls DEVICE recallPreset 1001
+    ... --recall "Morning Announcement"
 """
 from __future__ import annotations
 
@@ -50,7 +49,7 @@ async def main() -> int:
     parser.add_argument("--port", type=int, default=int(os.environ.get("TESIRA_PORT", "22")))
     parser.add_argument("--username", default=os.environ.get("TESIRA_USERNAME", "default"))
     parser.add_argument("--password", default=os.environ.get("TESIRA_PASSWORD", "default"))
-    parser.add_argument("--recall", type=int, help="Recall this preset ID after discovery")
+    parser.add_argument("--recall", help="Preset name to recall after connecting")
     args = parser.parse_args()
 
     if not args.host:
@@ -67,26 +66,13 @@ async def main() -> int:
         await client.connect()
         print("Connected.")
 
-        aliases = await client.get_aliases()
-        print(f"\n{len(aliases)} Instance Tag(s) found:")
-        for tag in aliases:
-            print(f"  - {tag}")
+        print("Testing the TTP session (SESSION get aliases) ...")
+        await client.async_test_session()
+        print("Session is responsive.")
 
-        print("\nProbing for Preset Button blocks ...")
-        presets = await client.discover_preset_buttons()
-        if presets:
-            print(f"{len(presets)} Preset Button(s) discovered:")
-            for name, preset_id in presets.items():
-                print(f"  - {name!r} -> preset {preset_id}")
-        else:
-            print(
-                "No Preset Button blocks found. Add one per preset you want "
-                "exposed in Home Assistant, or configure manual presets instead."
-            )
-
-        if args.recall is not None:
-            print(f"\nRecalling preset {args.recall} ...")
-            await client.recall_preset(args.recall)
+        if args.recall:
+            print(f"\nRecalling preset {args.recall!r} ...")
+            await client.recall_preset_by_name(args.recall)
             print("Recalled.")
 
     except TesiraError as err:

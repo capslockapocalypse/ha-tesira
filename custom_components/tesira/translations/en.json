@@ -22,7 +22,7 @@
   "options": {
     "step": {
       "menu": {
-        "title": "Manual presets",
+        "title": "Presets",
         "menu_options": {
           "add_preset": "Add a preset",
           "remove_preset": "Remove a preset",
@@ -30,22 +30,22 @@
         }
       },
       "add_preset": {
-        "title": "Add a manual preset",
-        "description": "Presets discovered automatically come from Preset Button blocks in the Tesira design. Use this to add a preset that doesn't have one. Leave Preset ID blank to recall by name instead.",
+        "title": "Add a preset",
+        "description": "Enter the preset name exactly as it's named in the Tesira project (DEVICE recallPresetByName is case- and spelling-sensitive).",
         "data": {
-          "name": "Name",
-          "preset_id": "Preset ID"
+          "name": "Name"
         }
       },
       "remove_preset": {
-        "title": "Remove manual presets",
+        "title": "Remove presets",
         "data": {
           "presets": "Presets to remove"
         }
       }
     },
     "error": {
-      "name_required": "Enter a preset name."
+      "name_required": "Enter a preset name.",
+      "already_exists": "That preset is already in the list."
     }
   }
 }

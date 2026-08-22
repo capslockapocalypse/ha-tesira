@@ -10,14 +10,7 @@ from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 
 from .client import TesiraClient, TesiraConnectionInfo, TesiraError
-from .const import (
-    CONF_MANUAL_PRESETS,
-    CONF_PRESET_ID,
-    CONF_PRESET_NAME,
-    DEFAULT_PORT,
-    DEFAULT_TIMEOUT,
-    DOMAIN,
-)
+from .const import CONF_PRESET_NAME, CONF_PRESETS, DEFAULT_PORT, DEFAULT_TIMEOUT, DOMAIN
 
 USER_SCHEMA = vol.Schema(
     {
@@ -28,12 +21,7 @@ USER_SCHEMA = vol.Schema(
     }
 )
 
-ADD_PRESET_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_PRESET_NAME): str,
-        vol.Optional(CONF_PRESET_ID): vol.Coerce(int),
-    }
-)
+ADD_PRESET_SCHEMA = vol.Schema({vol.Required(CONF_PRESET_NAME): str})
 
 
 class TesiraConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -55,7 +43,7 @@ class TesiraConfigFlow(ConfigFlow, domain=DOMAIN):
             client = TesiraClient(info)
             try:
                 await client.connect()
-                await client.get_aliases()
+                await client.async_test_session()
             except TesiraError:
                 errors["base"] = "cannot_connect"
             else:
@@ -76,12 +64,10 @@ class TesiraConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class TesiraOptionsFlow(OptionsFlow):
-    """Manage manually-defined presets that aren't backed by a Preset Button block."""
+    """Manage the list of preset names exposed as buttons."""
 
     def __init__(self, config_entry: ConfigEntry) -> None:
-        self._manual_presets: list[dict[str, Any]] = list(
-            config_entry.options.get(CONF_MANUAL_PRESETS, [])
-        )
+        self._presets: list[str] = list(config_entry.options.get(CONF_PRESETS, []))
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
         return await self.async_step_menu()
@@ -97,13 +83,10 @@ class TesiraOptionsFlow(OptionsFlow):
             name = user_input[CONF_PRESET_NAME].strip()
             if not name:
                 errors["base"] = "name_required"
+            elif name in self._presets:
+                errors["base"] = "already_exists"
             else:
-                preset: dict[str, Any] = {CONF_PRESET_NAME: name}
-                if CONF_PRESET_ID in user_input:
-                    preset[CONF_PRESET_ID] = user_input[CONF_PRESET_ID]
-                self._manual_presets = [
-                    p for p in self._manual_presets if p[CONF_PRESET_NAME] != name
-                ] + [preset]
+                self._presets.append(name)
                 return await self.async_step_menu()
 
         return self.async_show_form(
@@ -111,21 +94,17 @@ class TesiraOptionsFlow(OptionsFlow):
         )
 
     async def async_step_remove_preset(self, user_input: dict[str, Any] | None = None):
-        if not self._manual_presets:
+        if not self._presets:
             return await self.async_step_menu()
 
         if user_input is not None:
             to_remove = set(user_input["presets"])
-            self._manual_presets = [
-                p for p in self._manual_presets if p[CONF_PRESET_NAME] not in to_remove
-            ]
+            self._presets = [name for name in self._presets if name not in to_remove]
             return await self.async_step_menu()
 
-        options = {p[CONF_PRESET_NAME]: p[CONF_PRESET_NAME] for p in self._manual_presets}
+        options = {name: name for name in self._presets}
         schema = vol.Schema({vol.Required("presets", default=[]): cv.multi_select(options)})
         return self.async_show_form(step_id="remove_preset", data_schema=schema)
 
     async def async_step_finish(self, user_input: dict[str, Any] | None = None):
-        return self.async_create_entry(
-            title="", data={CONF_MANUAL_PRESETS: self._manual_presets}
-        )
+        return self.async_create_entry(title="", data={CONF_PRESETS: self._presets})
