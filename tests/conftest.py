@@ -18,7 +18,7 @@ if _PKG_NAME not in sys.modules:
     pkg.__path__ = [str(_PKG_DIR)]
     sys.modules[_PKG_NAME] = pkg
 
-    for module_name in ("const", "client"):
+    for module_name in ("const", "client", "optimistic"):
         spec = importlib.util.spec_from_file_location(
             f"{_PKG_NAME}.{module_name}", _PKG_DIR / f"{module_name}.py"
         )

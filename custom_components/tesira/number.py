@@ -3,6 +3,9 @@
 Values are pushed via TTP's native subscribe mechanism, not polled: each
 entity subscribes once when added and updates its state directly as
 `!`-prefixed push messages arrive on the persistent SSH session.
+
+Writes are optimistic: the new value is shown immediately and the push is
+used to reconcile afterwards (see optimistic.py).
 """
 from __future__ import annotations
 
@@ -24,6 +27,7 @@ from .const import (
     DEFAULT_LEVEL_SUBSCRIBE_THROTTLE_MS,
     DOMAIN,
 )
+from .optimistic import OptimisticLevel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,7 +92,7 @@ class TesiraLevelNumber(NumberEntity):
         self._attr_unique_id = f"{entry_id}_level_{slugify(tag)}_{channel}"
         self._attr_native_min_value = min_level
         self._attr_native_max_value = max_level
-        self._attr_native_value: float | None = None
+        self._level = OptimisticLevel(self._send_level, self.async_write_ha_state)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},
             name="Biamp Tesira",
@@ -97,10 +101,14 @@ class TesiraLevelNumber(NumberEntity):
         )
 
     @property
+    def native_value(self) -> float | None:
+        return self._level.value
+
+    @property
     def available(self) -> bool:
         # Not just self._client.connected: until the first push arrives we
         # don't actually know the current value yet.
-        return self._client.connected and self._attr_native_value is not None
+        return self._client.connected and self._level.value is not None
 
     async def async_added_to_hass(self) -> None:
         await self._client.subscribe_level(
@@ -112,14 +120,19 @@ class TesiraLevelNumber(NumberEntity):
         )
 
     async def async_will_remove_from_hass(self) -> None:
+        self._level.cancel()
         await self._client.unsubscribe_level(self._token)
 
     @callback
     def _handle_push(self, value: float) -> None:
-        self._attr_native_value = value
-        self.async_write_ha_state()
+        self._level.handle_push(value)
 
     async def async_set_native_value(self, value: float) -> None:
+        # Shows the new value straight away; the subscription push then
+        # reconciles it once writes have settled.
+        await self._level.async_set(value)
+
+    async def _send_level(self, value: float) -> None:
         try:
             try:
                 await self._client.set_level(self._tag, self._channel, value)
@@ -131,4 +144,3 @@ class TesiraLevelNumber(NumberEntity):
             raise HomeAssistantError(f"Tesira rejected the level change: {err}") from err
         except TesiraConnectionError as err:
             raise HomeAssistantError(f"Could not reach the Tesira: {err}") from err
-        # No need to update state here: the subscription push confirms it shortly.

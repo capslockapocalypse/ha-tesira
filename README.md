@@ -57,6 +57,15 @@ Assistant state directly. A `throttle_ms` (default 250ms, see
 pushes are sent while a value is changing continuously, e.g. during a
 fader ramp.
 
+Writes from Home Assistant are optimistic: the entity shows the new value
+immediately instead of waiting for the push, so repeated volume up/down
+presses each build on the previous one. Rapid writes are coalesced
+(only the latest target is sent once the in-flight `set` returns), and
+pushes are held back while writes are in flight and for 1s afterwards so
+an intermediate value can't snap the slider backwards. After that, the
+device's last pushed value wins if it differs (e.g. clamped or rounded),
+and a failed write reverts to it straight away.
+
 Subscriptions are session state on the Tesira and are lost on any
 reconnect, so the client tracks every active subscription and re-sends
 them all as soon as a new session is established — including after an
